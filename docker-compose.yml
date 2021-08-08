@@ -1,0 +1,9 @@
+version: '3'
+services:
+  database:
+    image: 'mongo:latest'
+    container_name: 'passportAuthMongo'
+    ports:
+      - '27017:27017'
+    volumes:
+      - ./data/mongo-db-volume:/data/db
