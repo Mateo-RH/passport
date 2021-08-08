@@ -1,10 +1,10 @@
 const router = require('express').Router();
-const { genPassword } = require('./passwordUtils');
-const { User } = require('./mongo').models;
+const { genPassword } = require('../utils/passwordUtils');
+const { User } = require('../mongo').models;
+const { isAuth } = require('./auth.middleware');
+const passport = require('passport');
 
-router.post('/login', (req, res) => {
-  return res.send('login');
-});
+router.post('/login', passport.authenticate('local'));
 
 router.post('/register', async (req, res) => {
   const { salt, hash } = genPassword(req.body.password);
@@ -20,11 +20,12 @@ router.post('/register', async (req, res) => {
 });
 
 router.get('/logout', (req, res, next) => {
+  req.logout();
   return res.send('logout');
 });
 
-router.get('/private', (req, res, next) => {
-  return res.send('private');
+router.get('/private', isAuth, (req, res, next) => {
+  return res.json(req.user);
 });
 
 module.exports = router;
