@@ -1,12 +1,26 @@
 const router = require('express').Router();
-const { genPassword } = require('../utils/passwordUtils');
+const {
+  genPassword,
+  issueJWT,
+  validPassword,
+} = require('../utils/passwordUtils');
 const { User } = require('../mongo').models;
-const { isAuth } = require('./auth.middleware');
 const passport = require('passport');
 
-router.post('/login', passport.authenticate('local'));
+router.post('/login', (req, res, next) => {
+  User.findOne({ username: req.body.username })
+    .then((user) => {
+      if (!user) res.status(401).json({ msg: 'could not find user' });
 
-router.post('/register', async (req, res) => {
+      const isValid = validPassword(req.body.password, user.hash, user.salt);
+
+      if (isValid) res.json({ user, ...issueJWT(user) });
+      else res.status(401).json({ msg: 'Wrong password' });
+    })
+    .catch((err) => next(err));
+});
+
+router.post('/register', (req, res, next) => {
   const { salt, hash } = genPassword(req.body.password);
 
   const newUser = new User({
@@ -15,8 +29,13 @@ router.post('/register', async (req, res) => {
     salt,
   });
 
-  await newUser.save();
-  return res.json(newUser);
+  newUser
+    .save()
+    .then((user) => {
+      const jwt = issueJWT(user);
+      res.json({ user, token: jwt.token, expiresIn: jwt.expires });
+    })
+    .catch((err) => next(err));
 });
 
 router.get('/logout', (req, res, next) => {
@@ -24,8 +43,12 @@ router.get('/logout', (req, res, next) => {
   return res.send('logout');
 });
 
-router.get('/private', isAuth, (req, res, next) => {
-  return res.json(req.user);
-});
+router.get(
+  '/private',
+  passport.authenticate('jwt', { session: false }),
+  (req, res, next) => {
+    return res.json({ user: req.user });
+  }
+);
 
 module.exports = router;

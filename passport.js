@@ -1,28 +1,23 @@
+const fs = require('fs');
+const path = require('path');
 const { User } = require('./mongo').models;
-const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy;
-const validPassword = require('./utils/passwordUtils').validPassword;
+const { Strategy, ExtractJwt } = require('passport-jwt');
 
-const verifyCallback = (username, password, done) => {
-  User.findOne({ username })
-    .then((user) => {
-      if (!user) return done(null, false);
-      const isValid = validPassword(password, user.hash, user.salt);
-      return isValid ? done(null, user) : done(null, false);
-    })
-    .catch((err) => done(err));
+const pathToKey = path.join(__dirname, './utils/id_rsa_pub.pem');
+const PUB_KEY = fs.readFileSync(pathToKey, 'utf-8');
+
+const options = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: PUB_KEY,
+  algorithms: ['RS256'],
 };
 
-const strategy = new LocalStrategy(verifyCallback);
-passport.use(strategy);
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
+const strategy = new Strategy(options, (payload, done) => {
+  User.findOne({ _id: payload.sub })
+    .then((user) => (user ? done(null, user) : done(null, false)))
+    .catch((err) => done(err, null));
 });
 
-passport.deserializeUser((userId, done) => {
-  console.log(userId);
-  User.findById(userId)
-    .then((user) => done(null, user))
-    .catch((err) => done(err));
-});
+module.exports = (passport) => {
+  passport.use(strategy);
+};
