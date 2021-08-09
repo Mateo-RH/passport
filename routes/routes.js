@@ -5,7 +5,7 @@ const {
   validPassword,
 } = require('../utils/passwordUtils');
 const { User } = require('../mongo').models;
-const passport = require('passport');
+const auth = require('./middlewares');
 
 router.post('/login', (req, res, next) => {
   User.findOne({ username: req.body.username })
@@ -43,12 +43,8 @@ router.get('/logout', (req, res, next) => {
   return res.send('logout');
 });
 
-router.get(
-  '/private',
-  passport.authenticate('jwt', { session: false }),
-  (req, res, next) => {
-    return res.json({ user: req.user });
-  }
-);
+router.get('/private', auth, (req, res, next) => {
+  return res.json({ user: req.user });
+});
 
 module.exports = router;
